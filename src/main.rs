@@ -1,0 +1,76 @@
+use clap::{
+    Arg,
+    Command,
+    SubCommand
+};
+
+fn main() {
+    let subs_option = Arg::new("subs")
+        .short('s')
+        .long("subtitles")
+        .help("Adds the substitles to the MKV file");
+    let merge_option = Arg::new("merge")
+        .short('m')
+        .long("merge")
+        .help("Merges the extracted content into a MKV container file");
+    let args = Command::new("GI Cutscenes")
+        .version("0.0.1")
+        .author("Lux A. Phifollen <limefox@vulpinecitrus.info>")
+        .about("Command-line utility to extract and demux GI cutscenes")
+        .subcommand(
+            Command::new("demuxUsm")
+                .about("Demuxes a specified .usm file to a specified folder")
+                .arg(Arg::new("demux-file")
+                    .short('f')
+                    .long("demux-file")
+                    .value_name("demux_file")
+                    .help("File to read and display on the console")
+                    .takes_value(true))
+                .arg(Arg::new("key1")
+                    .short('a')
+                    .long("key1")
+                    .value_name("key1")
+                    .help("4 lower bytes of the key")
+                    .takes_value(true))
+                .arg(Arg::new("key2")
+                    .short('b')
+                    .long("key2")
+                    .value_name("key2")
+                    .help("4 higher bytes of the key")
+                    .takes_value(true))
+                .arg(subs_option.clone())
+                .arg(merge_option.clone())
+        )
+        .subcommand(
+            Command::new("batcheDemux")
+                .about("Tries to demux all .usm files in the specified folder")
+                .arg(Arg::new("usm-folder")
+                    .short('u')
+                    .long("usm-folder")
+                    .value_name("usm_folder")
+                    .help("Folder containing the .usm files to be demuxed")
+                    .takes_value(true))
+                .arg(subs_option)
+                .arg(merge_option)
+        )
+        .subcommand(
+            Command::new("convertHca")
+                .about("Converts input .hca files into .wav files")
+                .arg(Arg::new("hca-input")
+                    .short('i')
+                    .long("hca-input")
+                    .value_name("hca_input")
+                    .help("File or directory to be processed")
+                    .takes_value(true))
+        )
+        .arg(Arg::new("output")
+             .short('o')
+             .long("output")
+             .value_name("output")
+             .help("Output folder"))
+        .arg(Arg::new("no-cleanup")
+            .visible_alias("nc")
+            .long("no-cleanup")
+            .help("Keeps the extracted files instead of removing them"))
+        .get_matches();
+}
