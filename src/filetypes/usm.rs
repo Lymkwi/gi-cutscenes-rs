@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, Result, SeekFrom};
 use std::fs::File;
@@ -128,7 +129,7 @@ impl USMFile {
 }
 
 impl Demuxable for USMFile {
-    fn demux(mut self, _video_extract: bool, _audio_extract: bool, _output: &Path) -> Result<()> {
+    fn demux(mut self, _video_extract: bool, _audio_extract: bool, _output: &Path) -> Result<(PathBuf, Vec<PathBuf>)> {
         let f = File::open(self.path.as_path())?;
         let mut file_size = f.metadata()?.len();
         let mut reader = BufReader::new(f);
@@ -137,12 +138,15 @@ impl Demuxable for USMFile {
         // Video output
         let mut video_path = PathBuf::from(self.path.as_path());
         video_path.set_extension("ivf");
-        let mut video_output = BufWriter::new(File::create(video_path)?);
+        let mut video_output = BufWriter::new(File::create(video_path.as_path())?);
 
-        // Audio output
+        // Audio outputs
         let mut audio_path = PathBuf::from(self.path.as_path());
-        audio_path.set_extension("hca");
-        let mut audio_output = BufWriter::new(File::create(audio_path)?);
+        let audio_base_name: String = audio_path.file_stem().unwrap().to_str().unwrap().into();
+        let mut audio_writers: HashMap<u8, BufWriter<_>> = HashMap::new();
+        let mut audio_files: Vec<PathBuf> = Vec::new();
+
+        //let mut audio_output = BufWriter::new(File::create(audio_path.as_path())?);
 
         while file_size > 0 {
             // Read 32 bits at a time
@@ -188,11 +192,17 @@ impl Demuxable for USMFile {
                 0x40534641 => {
                     // It's an audio block (@SFA)
                     // There is no decryption here, for now
-                    audio_output.write(&data)?;
+                    if !audio_writers.contains_key(&info.chno) {
+                        let filename = format!("{}_{}.hca", audio_base_name, info.chno);
+                        let mut path = audio_path.clone();
+                        path.set_file_name(filename);
+                        audio_writers.insert(info.chno, BufWriter::new(File::create(path)?));
+                    }
+                    audio_writers.get_mut(&info.chno).unwrap().write(&data)?;
                 }
                 _ => { /* we don't care */}
             }
         }
-        Ok(())
+        Ok((video_path, audio_files))
     }
 }

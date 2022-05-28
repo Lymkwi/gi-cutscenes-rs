@@ -3,17 +3,16 @@ use std::{
     path::{
         Path,
         PathBuf
-    },
-    ffi::{
-        OsString,
-        OsStr
     }
 };
 
-use crate::filetypes::USMFile;
+use crate::filetypes::{
+    HCAFile,
+    USMFile
+};
 
 pub trait Demuxable {
-    fn demux(self, video_extract: bool, audio_extract: bool, output: &Path) -> std::io::Result<()>;
+    fn demux(self, video_extract: bool, audio_extract: bool, output: &Path) -> std::io::Result<(PathBuf, Vec<PathBuf>)>;
 }
 
 use crate::version;
@@ -73,7 +72,7 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
     // Step 1 : What is the file name ?
     let filename: String = file.file_name().unwrap().to_str().unwrap().into();
     // Step 2 : Do we have keys ?
-    let (mut key1, mut key2) = match (key1, key2) {
+    let (key1, key2) = match (key1, key2) {
         (Some(k1), Some(k2)) => (k1, k2),
         _ => {
             match version_keys {
@@ -85,7 +84,11 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
             
         }
     };
-    let mut file: USMFile = USMFile::new(file, key_array(key1), key_array(key2));
-    file.demux(true, true, output.as_path());
+    let file: USMFile = USMFile::new(file, key_array(key1), key_array(key2));
+    let (_video_path, audio_path_vec) = file.demux(true, true, output.as_path())?;
+    for audio_path in audio_path_vec {
+        let _audio_file: HCAFile = HCAFile::new(audio_path, key_array(key1), key_array(key2));
+        //audio_file.convert_to_wav(output);
+    }
     Ok(())
 }
