@@ -68,12 +68,12 @@ fn key_array(key: u32) -> [u8; 4] {
     ]
 }
 
-pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key1: Option<u32>, key2: Option<u32>, output: PathBuf) -> Result<(), Error> {
+pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: PathBuf) -> Result<(), Error> {
     // Step 1 : What is the file name ?
     let filename: String = file.file_name().unwrap().to_str().unwrap().into();
     // Step 2 : Do we have keys ?
-    let (key1, key2) = match (key1, key2) {
-        (Some(k1), Some(k2)) => (k1, k2),
+    let (key2, key1) = match (key2, key1) {
+        (Some(k2), Some(k1)) => (k2, k1),
         _ => {
             match version_keys {
                 Some(v) => split_key(find_key(&filename, v)),
@@ -84,11 +84,12 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
             
         }
     };
-    let file: USMFile = USMFile::new(file, key_array(key1), key_array(key2));
+    println!("Keys derived for \"{}\" : ({:X}, {:X})", file.to_str().unwrap(), key1, key2);
+    let file: USMFile = USMFile::new(file, key2.to_le_bytes(), key1.to_le_bytes());
     let (_video_path, audio_path_vec) = file.demux(true, true, output.as_path())?;
     for audio_path in audio_path_vec {
-        let _audio_file: HCAFile = HCAFile::new(audio_path, key_array(key1), key_array(key2));
-        //audio_file.convert_to_wav(output);
+        let audio_file: HCAFile = HCAFile::new(audio_path.clone(), key_array(key2), key_array(key1))?;
+        audio_file.convert_to_wav(&audio_path)?;
     }
     Ok(())
 }

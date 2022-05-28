@@ -1,19 +1,4 @@
-use std::collections::HashMap;
-use std::io::prelude::*;
-use std::io::{BufReader, BufWriter, Result, SeekFrom};
-use std::fs::File;
-use std::path::{
-    Path,
-    PathBuf
-};
 
-use crate::{
-    demux::Demuxable,
-    tools::{
-        make_be32,
-        make_be16
-    }
-};
 
 struct USMInfo {
     sig: u32,
@@ -52,7 +37,7 @@ pub struct USMFile {
 }
 
 impl USMFile {
-    pub fn new(file: PathBuf, key1: [u8; 4], key2: [u8; 4]) -> Self {
+    pub fn new(file: PathBuf, key2: [u8; 4], key1: [u8; 4]) -> Self {
         let mut res: Self = Self {
             filename: file.file_name().unwrap().to_str().unwrap().into(),
             path: file,
@@ -63,12 +48,12 @@ impl USMFile {
             audio_mask: [0; 32]
         };
 
-        res.init_mask(key1, key2);
+        res.init_mask(key2, key1);
 
         res
     }
 
-    fn init_mask(&mut self, key1: [u8; 4], key2: [u8; 4]) {
+    fn init_mask(&mut self, key2: [u8; 4], key1: [u8; 4]) {
         self.video_mask_1[0x00] = key1[0];
         self.video_mask_1[0x01] = key1[1];
         self.video_mask_1[0x02] = key1[2];
@@ -84,7 +69,7 @@ impl USMFile {
         self.video_mask_1[0x0C] = self.video_mask_1[0x0B].wrapping_add(self.video_mask_1[0x09]);
         self.video_mask_1[0x0D] = self.video_mask_1[0x08].wrapping_sub(self.video_mask_1[0x03]);
         self.video_mask_1[0x0E] = self.video_mask_1[0x0D] ^ 0xFF;
-        self.video_mask_1[0x0F] = self.video_mask_1[0x0A].wrapping_sub(self.video_mask_1[0x08]);
+        self.video_mask_1[0x0F] = self.video_mask_1[0x0A].wrapping_sub(self.video_mask_1[0x0B]);
         self.video_mask_1[0x10] = self.video_mask_1[0x08].wrapping_sub(self.video_mask_1[0x0F]);
         self.video_mask_1[0x11] = self.video_mask_1[0x10] ^ self.video_mask_1[0x07];
         self.video_mask_1[0x12] = self.video_mask_1[0x0F] ^ 0xFF;
@@ -141,7 +126,7 @@ impl Demuxable for USMFile {
         let mut video_output = BufWriter::new(File::create(video_path.as_path())?);
 
         // Audio outputs
-        let mut audio_path = PathBuf::from(self.path.as_path());
+        let audio_path = PathBuf::from(self.path.as_path());
         let audio_base_name: String = audio_path.file_stem().unwrap().to_str().unwrap().into();
         let mut audio_writers: HashMap<u8, BufWriter<_>> = HashMap::new();
         let mut audio_files: Vec<PathBuf> = Vec::new();
@@ -184,21 +169,28 @@ impl Demuxable for USMFile {
                         0 => {
                             // Do we extract the video ?
                             self.mask_video(&mut data, size as usize);
+                            let position = video_output.stream_position().unwrap();
+                            if position < 18000 {
+                                println!("Writing {:x} size {}", position, size);
+                            }
                             video_output.write(&data)?;
                         },
                         _ => { /* we don't care */ }
                     }
                 },
                 0x40534641 => {
-                    // It's an audio block (@SFA)
-                    // There is no decryption here, for now
-                    if !audio_writers.contains_key(&info.chno) {
-                        let filename = format!("{}_{}.hca", audio_base_name, info.chno);
-                        let mut path = audio_path.clone();
-                        path.set_file_name(filename);
-                        audio_writers.insert(info.chno, BufWriter::new(File::create(path)?));
+                    if info.data_type == 0 {
+                        // It's an audio block (@SFA)
+                        // There is no decryption here, for now
+                        if !audio_writers.contains_key(&info.chno) {
+                            let filename = format!("{}_{}.hca", audio_base_name, info.chno);
+                            let mut path = audio_path.clone();
+                            path.set_file_name(filename);
+                            audio_files.push(path.clone());
+                            audio_writers.insert(info.chno, BufWriter::new(File::create(path)?));
+                        }
+                        audio_writers.get_mut(&info.chno).unwrap().write(&data)?;
                     }
-                    audio_writers.get_mut(&info.chno).unwrap().write(&data)?;
                 }
                 _ => { /* we don't care */}
             }

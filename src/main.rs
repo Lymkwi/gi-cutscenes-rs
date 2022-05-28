@@ -17,6 +17,8 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::missing_crate_level_docs)]
 
+#![allow(dead_code)]
+
 use clap::{
     Arg,
     Command, ValueHint
@@ -158,7 +160,7 @@ fn main() {
                         return;
                     }
                     match version::read_version_file(PathBuf::from(version_file)) {
-                        Ok(keys) => Some(keys),
+                        Ok(keys) => Some(keys.to_vec()),
                         Err(e) => {
                             eprintln!("Error reading key file : {}", e.to_string());
                             return;
@@ -171,7 +173,7 @@ fn main() {
                 file.to_str().unwrap(),
                 output.to_str().unwrap(),
                 key1, key2, version_file, subs, merge, cleanup);
-            let _res = demux::process_file(file, version_keys, key1, key2, output);
+            let _res = demux::process_file(file, version_keys, key2, key1, output);
         },
         Some(("batchDemux", cmd)) => {
             // Start to extract the arguments
@@ -191,7 +193,7 @@ fn main() {
             // We haven't validated this json, we need to. We just know it's a file that exists
             let version_keys: Vec<version::Data> = match version::read_version_file(cmd.value_of("version-keys").unwrap())
             {
-                Ok(good) => good,
+                Ok(good) => good.to_vec(),
                 Err(e) => {
                     eprintln!("Error opening version keys file: {}", e.to_string());
                     return;

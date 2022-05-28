@@ -1,3 +1,4 @@
+#[derive(Copy, Clone)]
 pub struct Channel {
     block: [f32; 0x80],
     base_table: [f32; 0x80],
@@ -201,24 +202,26 @@ impl Channel {
         }
     }
 
-    fn decode_four(&mut self, index: usize, a: u32, b: u32, c: u32, chan: &mut Channel) {
+    fn decode_four(&mut self, index: usize, a: u32, b: u32, c: u32, chan: &Channel) -> Channel {
+        let mut new_channel = chan.clone();
         if self.r#type != 1 && c != 0 {
             let list: [u32; 0x10] = [
                 0x40000000, 0x3FEDB6DB, 0x3FDB6DB7, 0x3FC92492, 0x3FB6DB6E, 0x3FA49249, 0x3F924925, 0x3F800000,
                 0x3F5B6DB7, 0x3F36DB6E, 0x3F124925, 0x3EDB6DB7, 0x3E924925, 0x3E124925, 0x00000000, 0x00000000
             ];
-            let f1 = f32::from_bits(list[chan.value2[index] as usize]);
+            let f1 = f32::from_bits(list[new_channel.value2[index] as usize]);
             let f2 = f1 - 2.0;
 
             let mut self_index: usize = b as usize;
             let mut data_index: usize = b as usize;
             (0..a).for_each(|_| {
-                chan.block[data_index] = self.block[self_index] * f2;
+                new_channel.block[data_index] = self.block[self_index] * f2;
                 self.block[self_index] *= f1;
                 data_index += 1;
                 self_index += 1;
             })
         }
+        new_channel
     }
 
     fn decode_five(&mut self, index: usize) {
@@ -452,8 +455,8 @@ impl Channel {
                     let a = self_table[p1]; p1 += 1;
                     let b = self_table[p2]; p2 += 1;
 
-                    let c = f32::from_bits(substitutions[1][i][list_1_float_i]); list_1_float_i += 1;
-                    let p = f32::from_bits(substitutions[2][i][list_2_float_i]); list_2_float_i += 1;
+                    let c = f32::from_bits(substitutions[0][i][list_1_float_i]); list_1_float_i += 1;
+                    let p = f32::from_bits(substitutions[1][i][list_2_float_i]); list_2_float_i += 1;
 
                     data_table[d1] = a * c - b * p; d1 += 1;
                     data_table[d2] = a * p + b * c; d2 -= 1;
