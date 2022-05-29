@@ -84,7 +84,7 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
             
         }
     };
-    println!("Keys derived for \"{}\" : ({:X}, {:X})", file.to_str().unwrap(), key1, key2);
+    println!("Keys derived for \"{}\" : ({:08X}, {:08X})", file.to_str().unwrap(), key2, key1);
     let file: USMFile = USMFile::new(file, key2.to_le_bytes(), key1.to_le_bytes());
     let (_video_path, audio_path_vec) = file.demux(true, true, output.as_path())?;
     for audio_path in audio_path_vec {

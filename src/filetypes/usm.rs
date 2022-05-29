@@ -169,10 +169,6 @@ impl Demuxable for USMFile {
                         0 => {
                             // Do we extract the video ?
                             self.mask_video(&mut data, size as usize);
-                            let position = video_output.stream_position().unwrap();
-                            if position < 18000 {
-                                println!("Writing {:x} size {}", position, size);
-                            }
                             video_output.write(&data)?;
                         },
                         _ => { /* we don't care */ }

@@ -17,7 +17,7 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::missing_crate_level_docs)]
 
-#![allow(dead_code)]
+//#![allow(dead_code)]
 
 use clap::{
     Arg,

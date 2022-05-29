@@ -104,10 +104,13 @@ impl Channel {
             v = self.value[i as usize] as i32;
             if v != 0 {
                 v = ath_table[i as usize] as i32 + (b + (i as i32) >> 8) - v * 5 / 2 + 1;
-            } else if v >= 0x39 {
-                v = 1;
-            } else {
-                v = SCALE_LIST[v as usize] as i32;
+                if v < 0 {
+                    v = 15;
+                } else if v >= 0x39 {
+                    v = 1;
+                } else {
+                    v = SCALE_LIST[v as usize] as i32;
+                }
             }
             self.scale[i as usize] = v.try_into().unwrap();
         }
@@ -120,8 +123,10 @@ impl Channel {
             let mul: f32 = if self.value[i as usize] < 64 && self.value[i as usize] >= 0 {
                 f32::from_bits(VALUE_INT[(value_float_i + self.value[i as usize] as u32) as usize])
             } else { 0.0 };
+            let own_scale_idx = self.scale[i as usize] as u32;
+            let def_scale_idx = scale_float_i + own_scale_idx;
             self.base_table[i as usize] = mul * f32::from_bits(
-                SCALE_INT[(scale_float_i + self.scale[i as usize] as u32) as usize]
+                SCALE_INT[def_scale_idx as usize]
             );
         }
     }
@@ -154,12 +159,12 @@ impl Channel {
 
             let s: isize = self.scale[index].try_into().unwrap();
             let bit_size = list1[s as usize];
-            let mut v = data.get_bit(bit_size as i32) as usize;
+            let mut v = data.get_bit(bit_size as i32) as isize;
             let f: f32 = if s < 0 {
                 let shifted: isize = (s << 4).try_into().unwrap();
-                v += shifted as usize;
-                data.add_bit((list2[v] - bit_size) as i32);
-                list3[v]
+                v += shifted;
+                data.add_bit((list2[v as usize] - bit_size) as i32);
+                list3[v as usize]
             } else {
                 v = (1 - ((v & 1) << 1)) * (v / 2);
                 if v == 0 { data.add_bit(-1); }
@@ -171,7 +176,7 @@ impl Channel {
 
         // Clear the table between these two points
         let begin: usize = self.count as usize;
-        let size: usize = 4 * (0x80 - begin);
+        let size: usize = 0x80 - begin;
         self.block[begin .. begin+size].iter_mut().for_each(|x| *x = 0.0);
     }
 
@@ -516,13 +521,13 @@ impl Channel {
         (0..0x40).for_each(|_| {
             s -= 1;
             self.wav3[s2] = self.wav2[s1] * f32::from_bits(subs_third[1][s]);
-            s1 += 1;
+            s1 = s1.wrapping_sub(1);
             s2 += 1;
         });
         s = 0x40;
         (0..0x40).for_each(|_| {
             s -= 1;
-            s1 += 1;
+            s1 = s1.wrapping_add(1);
             self.wav3[s2] = f32::from_bits(subs_third[0][s]) * self.wav2[s1];
             s2 += 1;
         });
@@ -553,7 +558,11 @@ impl ClData {
     fn check_bit(&self, bit_size: i32) -> i32 {
         let mut v: i32 = 0;
         if self.bit + bit_size <= self.size {
-            let data_offset: usize = (self.bit >> 3) as usize;
+            let data_offset = (self.bit >> 3) as usize;
+            if data_offset >= self.data.len() {
+                println!("{:?}", self.bit.checked_shr(3));
+                return 0;
+            }
             v = self.data[data_offset];
             v = v << 8 | (if data_offset + 1 < self.data.len() { self.data[data_offset + 1] } else { 0 });
             v = v << 8 | (if data_offset + 2 < self.data.len() { self.data[data_offset + 2] } else { 0 });

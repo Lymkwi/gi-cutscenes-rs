@@ -37,16 +37,16 @@ impl WaveRiff {
     fn build_byte_array(&self) -> Vec<u8> {
         let mut result = Vec::new();
         result.extend(self.riff);
-        result.extend(self.riff_size.to_be_bytes());
+        result.extend(self.riff_size.to_le_bytes());
         result.extend(self.wave);
         result.extend(self.fmt);
-        result.extend(self.fmt_size.to_be_bytes());
-        result.extend(self.fmt_type.to_be_bytes());
-        result.extend(self.fmt_channel_count.to_be_bytes());
-        result.extend(self.fmt_sampling_rate.to_be_bytes());
-        result.extend(self.fmt_sampling_per_sec.to_be_bytes());
-        result.extend(self.fmt_sampling_size.to_be_bytes());
-        result.extend(self.fmt_bit_count.to_be_bytes());
+        result.extend(self.fmt_size.to_le_bytes());
+        result.extend(self.fmt_type.to_le_bytes());
+        result.extend(self.fmt_channel_count.to_le_bytes());
+        result.extend(self.fmt_sampling_rate.to_le_bytes());
+        result.extend(self.fmt_sampling_per_sec.to_le_bytes());
+        result.extend(self.fmt_sampling_size.to_le_bytes());
+        result.extend(self.fmt_bit_count.to_le_bytes());
 
         result
     }
@@ -114,7 +114,7 @@ impl WaveData {
     fn build_byte_array(&self) -> Vec<u8> {
         let mut res = Vec::new();
         res.extend(self.data);
-        res.extend(self.data_size.to_be_bytes());
+        res.extend(self.data_size.to_le_bytes());
 
         return res;
     }
