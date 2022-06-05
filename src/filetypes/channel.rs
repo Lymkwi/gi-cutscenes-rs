@@ -71,7 +71,7 @@ impl Channel {
             let mut v1 = data.get_bit(6);
             let v2 = (1 << v) - 1;
             let v3 = v2 >> 1;
-            let mut v4;
+            let mut v4 = 0;
             self.value[0] = v1 as i8;
             for i in 1..self.count {
                 v4 = data.get_bit(v);
@@ -436,7 +436,7 @@ impl Channel {
             d = w;
 
             i += 1;
-            count1 *= 2;
+            count1 <<= 1;
             count2 >>= 1;
         }
 
@@ -485,7 +485,7 @@ impl Channel {
 
             i += 1;
             count1 >>= 1;
-            count2 *= 2;
+            count2 <<= 1;
         }
 
         d = 0;
