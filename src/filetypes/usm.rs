@@ -101,7 +101,7 @@ impl USMFile {
 }
 
 impl Demuxable for USMFile {
-    fn demux(mut self, _video_extract: bool, _audio_extract: bool, _output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
+    fn demux(mut self, video_extract: bool, audio_extract: bool, _output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
         let f = File::open(self.path.as_path())?;
         let mut file_size = f.metadata()?.len();
         let mut reader = BufReader::new(f);
@@ -152,14 +152,13 @@ impl Demuxable for USMFile {
                 //0x4352_4944 => { /* (CRID) Nothing to do */ },
                 0x4053_4656 => {
                     // It's a video block (@SFV)
-                   if info.data_type == 0 {
-                        // FIXME: Do we extract the video ?
+                   if info.data_type == 0 && video_extract {
                         self.mask_video(&mut data, size as usize);
                         video_output.write_all(&data)?;
                     }
                 },
                 0x4053_4641 => {
-                    if info.data_type == 0 {
+                    if info.data_type == 0  && audio_extract {
                         // It's an audio block (@SFA)
                         // FIXME: Do we extract audio ?
                         if !audio_writers.contains_key(&info.chno) {
