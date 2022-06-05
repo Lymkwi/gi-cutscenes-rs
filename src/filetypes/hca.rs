@@ -83,6 +83,7 @@ impl HCAFile {
         Ok(res)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn read_header(&mut self) -> Result<()> {
         if !self.filename.exists() {
             return Err(Error::new(ErrorKind::NotFound, "Could not find file"));
@@ -95,16 +96,16 @@ impl HCAFile {
         let mut hca_byte: [u8; 8] = [0; 8];
         fs.read_exact(&mut hca_byte)?;
 
-        let mut sign = u32::from_le_bytes([hca_byte[0], hca_byte[1], hca_byte[2], hca_byte[3]]) & 0x7F7F7F7F;
-        let magic = if sign == 0x00414348 {
+        let mut sign = u32::from_le_bytes([hca_byte[0], hca_byte[1], hca_byte[2], hca_byte[3]]) & 0x7F7F_7F7F;
+        let magic = if sign == 0x0041_4348 {
             self.encrypted = true;
-            0x7F7F7F7F
+            0x7F7F_7F7F
         } else {
-            0xFFFFFFFF
+            0xFFFF_FFFF
         };
 
         sign = u32::from_le_bytes([hca_byte[0], hca_byte[1], hca_byte[2], hca_byte[3]]) & magic;
-        if sign == 0x00414348 {
+        if sign == 0x0041_4348 {
             let conv = sign.to_le_bytes();
             (0..4).for_each(|i| hca_byte[i] = conv[i]);
             self.hca_header.version = u16::from_be_bytes([hca_byte[4], hca_byte[5]]);
@@ -127,7 +128,7 @@ impl HCAFile {
             header[header_offset+3]
         ]) & magic;
 
-        if sign == 0x00746D66 {
+        if sign == 0x0074_6D66 {
             header[header_offset .. header_offset + 4].iter_mut().zip(&hca_byte).for_each(|(dest, source)| *dest = *source);
             //header[header_offset] = converted[0];
             self.hca_header.channel_count = u16::from(header[header_offset + 4]);
@@ -150,7 +151,7 @@ impl HCAFile {
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
     
-        if sign == 0x706D6F63 { // COMP
+        if sign == 0x706D_6F63 { // COMP
             header.iter_mut().zip(&sign.to_le_bytes()).for_each(|(dest, source)| *dest = *source);
             self.hca_header.block_size = u16::from_be_bytes([
                 header[header_offset + 4],
@@ -172,7 +173,7 @@ impl HCAFile {
                 panic!("Incorrect comp values");
             }
             header_offset += 16;
-        } else if sign == 0x00636564 {
+        } else if sign == 0x0063_6564 {
             header.iter_mut().zip(&sign.to_le_bytes()).for_each(|(dest, source)| *dest = *source);
             self.hca_header.block_size = u16::from_be_bytes([
                 header[header_offset + 4],
@@ -188,7 +189,7 @@ impl HCAFile {
             } else {
                 u32::from(header[header_offset + 0x8] + 1)
             };
-            self.hca_header.comp_r07 = u32::from(self.hca_header.comp_r05 - self.hca_header.comp_r06);
+            self.hca_header.comp_r07 = self.hca_header.comp_r05 - self.hca_header.comp_r06;
             self.hca_header.comp_r08 = 0;
             if !(self.hca_header.block_size >= 8 || self.hca_header.block_size == 0) {
                 panic!("Invalid block_size");
@@ -208,7 +209,7 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x00726276 {
+        if sign == 0x0072_6276 {
             header.iter_mut().zip(sign.to_le_bytes()).for_each(|(dst, src)| *dst = src);
             header_offset += 8;
         }
@@ -218,7 +219,7 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x61746800 {
+        if sign == 0x6174_6800 {
             header.iter_mut().zip(sign.to_be_bytes()).for_each(|(dst, src)| *dst = src);
             self.hca_header.ath_type = u16::from_be_bytes([header[header_offset + 4], header[header_offset + 4]]);
             header_offset += 6;
@@ -231,7 +232,7 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x6C6F6F70 {
+        if sign == 0x6C6F_6F70 {
             header.iter_mut().zip(sign.to_be_bytes()).for_each(|(dst, src)| *dst = src);
             self.hca_header.loop_flag = true;
             header_offset += 16;
@@ -244,7 +245,7 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x63697068 {
+        if sign == 0x6369_7068 {
             header.iter_mut().zip(sign.to_be_bytes()).for_each(|(dst, src)| *dst = src);
             self.hca_header.cipher_type = u16::from_be_bytes([
                 header[header_offset + 4], header[header_offset + 5]
@@ -261,7 +262,7 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x72766100 {
+        if sign == 0x7276_6100 {
             header.iter_mut().zip(sign.to_be_bytes()).for_each(|(dst, src)| *dst = src);
             self.hca_header.volume = f32::from_be_bytes([
                 header[header_offset + 4], header[header_offset + 5],
@@ -276,7 +277,7 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x636F6D6D {
+        if sign == 0x636F_6D6D {
             header.iter_mut().zip(sign.to_be_bytes()).for_each(|(dst, src)| *dst = src);
             header_offset += 5;
         }
@@ -285,12 +286,12 @@ impl HCAFile {
             header[header_offset], header[header_offset + 1],
             header[header_offset + 2], header[header_offset + 3]
         ]) & magic;
-        if sign == 0x70616400 {
+        if sign == 0x7061_6400 {
             header.iter_mut().zip(sign.to_be_bytes()).for_each(|(dst, src)| *dst = src);
             //header_offset += 4;
         }
 
-        let csum = HCAFile::checksum(&header, header.len() - 2);
+        let csum = Self::checksum(&header, header.len() - 2);
         header.iter_mut().zip(csum.to_be_bytes()).for_each(|(dst, src)| *dst = src);
         let data_size: usize = usize::from(self.hca_header.block_size) * self.hca_header.block_count as usize;
         self.data = vec![0; data_size];
@@ -310,9 +311,9 @@ impl HCAFile {
         Ok(())
     }
 
-    fn reformulate(a: u32, b: u32) -> u32 {
+    const fn reformulate(a: u32, b: u32) -> u32 {
         if b > 0 {
-            a / b + (if a % b != 0 { 1 } else { 0 })
+            a / b + (if a % b == 0 { 0 } else { 1 })
         } else {
             0
         }
@@ -328,7 +329,7 @@ impl HCAFile {
             panic!("Comp values invalid");
         }
 
-        self.hca_header.comp_r09 = HCAFile::reformulate(
+        self.hca_header.comp_r09 = Self::reformulate(
             self.hca_header.comp_r05 - (self.hca_header.comp_r06 + self.hca_header.comp_r07),
             self.hca_header.comp_r08
         );
@@ -360,13 +361,7 @@ impl HCAFile {
                             r[c + 4] = 2;
                         }
                     },
-                    6 => {
-                        r[c] = 1;
-                        r[c + 1] = 2;
-                        r[c + 4] = 1;
-                        r[c + 5] = 2;
-                    },
-                    7 => {
+                    6 | 7 => {
                         r[c] = 1;
                         r[c + 1] = 2;
                         r[c + 4] = 1;
@@ -389,7 +384,7 @@ impl HCAFile {
             let index = usize::from(i);
             self.hca_channel[index].r#type = i32::from(r[index]);
             self.hca_channel[index].value_3i = self.hca_header.comp_r06 + self.hca_header.comp_r07;
-            self.hca_channel[index].count = self.hca_header.comp_r06 + (if r[index] != 2 { self.hca_header.comp_r07 } else { 0 });
+            self.hca_channel[index].count = self.hca_header.comp_r06 + (if r[index] == 2 { 0 } else { self.hca_header.comp_r07 });
         }
     }
 
@@ -419,13 +414,13 @@ impl HCAFile {
                 }
                 key1 -= 1;
 
-                for i in 0..7 {
-                    t1[i] = key1.to_le_bytes()[0];
+                for item in &mut t1 {
+                    *item = key1.to_le_bytes()[0];
                     key1 = key1 >> 8 | key2 << 24;
                     key2 >>= 8;
                 }
 
-                let mut t2 = [
+                let t2 = [
                     t1[1], t1[1] ^ t1[6], t1[2] ^ t1[3],
                     t1[2], t1[2] ^ t1[1], t1[3] ^ t1[4],
                     t1[3], t1[3] ^ t1[2], t1[4] ^ t1[5],
@@ -434,10 +429,10 @@ impl HCAFile {
                     t1[6]                    
                 ];
                 let mut t3 = [0; 0x100];
-                let t31: [u8; 0x10] = HCAFile::init_cipher56_table(t1[0]);
+                let t31: [u8; 0x10] = Self::init_cipher56_table(t1[0]);
                 let mut t32: [u8; 0x10];
                 for i in 0..0x10 {
-                    t32 = HCAFile::init_cipher56_table(t2[i]);
+                    t32 = Self::init_cipher56_table(t2[i]);
                     let v = t31[i] << 4;
                     t32.iter().enumerate().for_each(|(index, j)| {
                         t3[i * 0x10 + index] = v | j;
@@ -467,9 +462,9 @@ impl HCAFile {
         let mul = (val & 1) << 3 | 5;
         let add = val & 0xE | 1;
         let mut key = val >> 4;
-        for i in 0..0x10 {
+        for item in &mut table {
             key = key.wrapping_mul(mul).wrapping_add(add) & 0xF;
-            table[i] = key;
+            *item = key;
         }
         table
     }
@@ -563,7 +558,7 @@ impl HCAFile {
 
         let mut sum: u16 = 0;
         for i in 0..size {
-            sum = sum << 8 ^ v[usize::from(sum >> 8 ^ u16::from(data[usize::from(i)]))];
+            sum = sum << 8 ^ v[usize::from(sum >> 8 ^ u16::from(data[i]))];
         }
         sum
     }
@@ -600,7 +595,7 @@ impl HCAFile {
 
         // Start to write the actual wav file
         let mut wav_file: File = File::create(wav_path)?;
-        wav_file.write(&header)?;
+        wav_file.write_all(&header)?;
 
         self.hca_header.volume *= volume;
     
@@ -626,7 +621,7 @@ impl HCAFile {
                             0x00 => f.trunc(), // float mode
                             0x08 => (f * f64::from(i8::MAX)).trunc() + 128.0, // 8 bit mode
                             0x10 => (f * f64::from(i16::MAX)).trunc(), // 16 bits
-                            0x18 => (f * f64::from(0x800000 - 1)).trunc(), // 24 bits
+                            0x18 => (f * f64::from(0x0080_0000 - 1)).trunc(), // 24 bits
                             0x20 => (f * f64::from(i32::MAX)).trunc(), // 32 bits
                             _ => {
                                 panic!("Mode not supported: {}", mode);
@@ -636,7 +631,7 @@ impl HCAFile {
                             println!("{} -> {}", f, v);
                         }*/
                         let max_bytes = usize::from(mode / 0x08);
-                        wav_file.write(&v.to_le_bytes()[0..max_bytes])?;
+                        wav_file.write_all(&v.to_le_bytes()[0..max_bytes])?;
                     }
                 }
             }
@@ -660,7 +655,7 @@ impl HCAFile {
 
         let channel_count = self.hca_header.channel_count;
         (0..channel_count).for_each(|i| {
-            self.hca_channel[i as usize].decode_one(&mut data_block, self.hca_header.comp_r09, a, self.ath_table.to_vec());
+            self.hca_channel[i as usize].decode_one(&mut data_block, self.hca_header.comp_r09, a, self.ath_table.as_ref());
         });
 
         // Do 8 rounds of decoding
@@ -693,6 +688,6 @@ impl HCAFile {
         (0..block_size).for_each(|i| {
             let d = data[i];
             data[i] = self.cipher_table[usize::from(d)];
-        })
+        });
     }
 }

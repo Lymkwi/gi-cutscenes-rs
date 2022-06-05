@@ -102,7 +102,7 @@ impl USMFile {
             let mut mask: [u8; 0x20] = self.video_mask_2;
             for i in 0x100..size {
                 data[i + data_offset] ^= mask[i & 0x1F];
-                mask[i & 0x1F] = (data[i + data_offset] ^ self.video_mask_2[i & 0x1F]).try_into().unwrap();
+                mask[i & 0x1F] = data[i + data_offset] ^ self.video_mask_2[i & 0x1F];
             }
             let mut mask: [u8; 0x20] = self.video_mask_1;
             for i in 0..0x100 {
@@ -151,41 +151,40 @@ impl Demuxable for USMFile {
 
             // Now work with the rest of the data
             // Read the size of the data
-            let size: usize = (info.data_size - (info.data_offset as u32) - (info.padding_size as u32)) as usize;
-            reader.seek(SeekFrom::Current((info.data_offset - 0x18) as i64))?;
+            let size: usize = (info.data_size - u32::from(info.data_offset) - u32::from(info.padding_size)) as usize;
+            reader.seek(SeekFrom::Current(i64::from(info.data_offset - 0x18)))?;
             let mut data = vec![0u8; size];
             reader.read_exact(&mut data)?;
             // Skip padding
-            reader.seek(SeekFrom::Current(info.padding_size as i64))?;
+            reader.seek(SeekFrom::Current(i64::from(info.padding_size)))?;
             // Account for it
-            file_size -= (info.data_size - 0x18) as u64;
+            file_size -= u64::from(info.data_size - 0x18);
 
             // Depending on the signature, do something different
             match info.sig {
-                0x43524944 => { /* (CRID) Nothing to do */ },
-                0x40534656 => {
+                //0x4352_4944 => { /* (CRID) Nothing to do */ },
+                0x4053_4656 => {
                     // It's a video block (@SFV)
-                    match info.data_type {
-                        0 => {
-                            // Do we extract the video ?
-                            self.mask_video(&mut data, size as usize);
-                            video_output.write(&data)?;
-                        },
-                        _ => { /* we don't care */ }
+                   if info.data_type == 0 {
+                        // FIXME: Do we extract the video ?
+                        self.mask_video(&mut data, size as usize);
+                        video_output.write_all(&data)?;
                     }
                 },
-                0x40534641 => {
+                0x4053_4641 => {
                     if info.data_type == 0 {
                         // It's an audio block (@SFA)
-                        // There is no decryption here, for now
+                        // FIXME: Do we extract audio ?
                         if !audio_writers.contains_key(&info.chno) {
+                        }
+                        if let std::collections::hash_map::Entry::Vacant(e) = audio_writers.entry(info.chno) {
                             let filename = format!("{}_{}.hca", audio_base_name, info.chno);
                             let mut path = audio_path.clone();
                             path.set_file_name(filename);
                             audio_files.push(path.clone());
-                            audio_writers.insert(info.chno, BufWriter::new(File::create(path)?));
+                            e.insert(BufWriter::new(File::create(path)?));
                         }
-                        audio_writers.get_mut(&info.chno).unwrap().write(&data)?;
+                        audio_writers.get_mut(&info.chno).unwrap().write_all(&data)?;
                     }
                 }
                 _ => { /* we don't care */}

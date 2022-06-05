@@ -116,6 +116,6 @@ impl WaveData {
         res.extend(self.data);
         res.extend(self.data_size.to_le_bytes());
 
-        return res;
+        res
     }
 }

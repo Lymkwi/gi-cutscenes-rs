@@ -138,8 +138,8 @@ fn main() {
             // Start to extract the arguments
             // Clap already validated the paths and the key values if any
             let file: PathBuf = PathBuf::from(cmd.value_of("demux-file").unwrap());
-            let key1: Option<u32> = cmd.value_of("key1").map(|s| u32::from_str_radix(s, 16).unwrap());
-            let key2: Option<u32> = cmd.value_of("key2").map(|s| u32::from_str_radix(s, 16).unwrap());
+            let key_1: Option<u32> = cmd.value_of("key1").map(|s| u32::from_str_radix(s, 16).unwrap());
+            let key_2: Option<u32> = cmd.value_of("key2").map(|s| u32::from_str_radix(s, 16).unwrap());
             let subs: bool = cmd.is_present("subs");
             let merge: bool = cmd.is_present("merge");
             let output: PathBuf = args.value_of("output")
@@ -153,16 +153,16 @@ fn main() {
 
             // We haven't validated the file here
             let version_file: &str = cmd.value_of("version-keys").unwrap();
-            let version_keys: Option<Vec<version::Data>> = if key1.is_none() || key2.is_none() {
+            let version_keys: Option<Vec<version::Data>> = if key_1.is_none() || key_2.is_none() {
                     // Let's validate that the file exists
                     if let Err(e) = validate::is_file(version_file) {
-                        eprintln!("Error opening version keys file : {}", e.to_string());
+                        eprintln!("Error opening version keys file : {}", e);
                         return;
                     }
                     match version::read_version_file(PathBuf::from(version_file)) {
-                        Ok(keys) => Some(keys.to_vec()),
+                        Ok(keys) => Some(keys),
                         Err(e) => {
-                            eprintln!("Error reading key file : {}", e.to_string());
+                            eprintln!("Error reading key file : {}", e);
                             return;
                         }
                     }
@@ -172,8 +172,8 @@ fn main() {
             println!("FileDemux: file: {}, output: {}, key1: {:?}, key2: {:?}, version file: {:?}, subs: {}, merge: {}, cleanup: {}",
                 file.to_str().unwrap(),
                 output.to_str().unwrap(),
-                key1, key2, version_file, subs, merge, cleanup);
-            let _res = demux::process_file(file, version_keys, key2, key1, output);
+                key_1, key_2, version_file, subs, merge, cleanup);
+            let _res = demux::process_file(file, version_keys, key_2, key_1, output.as_path());
         },
         Some(("batchDemux", cmd)) => {
             // Start to extract the arguments
@@ -193,9 +193,9 @@ fn main() {
             // We haven't validated this json, we need to. We just know it's a file that exists
             let version_keys: Vec<version::Data> = match version::read_version_file(cmd.value_of("version-keys").unwrap())
             {
-                Ok(good) => good.to_vec(),
+                Ok(good) => good,
                 Err(e) => {
-                    eprintln!("Error opening version keys file: {}", e.to_string());
+                    eprintln!("Error opening version keys file: {}", e);
                     return;
                 }
             };
