@@ -2,9 +2,6 @@ use std::io::{
     prelude::*,
     BufReader,
     BufWriter,
-    Error,
-    ErrorKind,
-    Result,
     SeekFrom
 };
 
@@ -17,6 +14,10 @@ use std::path::{
 
 use crate::{
     demux::Demuxable,
+    errors::{
+        GICSError,
+        GICSResult
+    },
     tools::{
         make_be32,
         make_be16

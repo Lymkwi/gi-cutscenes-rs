@@ -4,12 +4,13 @@ use std::{
     path::PathBuf,
     io::{
         Error,
-        ErrorKind
+        ErrorKind,
+        Result
     }
 };
 
 /// Verify that the provided path exists
-fn exists<T: Into<PathBuf>>(path: T) -> Result<PathBuf, std::io::Error>
+fn exists<T: Into<PathBuf>>(path: T) -> Result<PathBuf>
     where PathBuf: From<T>
 {
     // 1. Can you build a path ?
@@ -22,7 +23,7 @@ fn exists<T: Into<PathBuf>>(path: T) -> Result<PathBuf, std::io::Error>
 }
 
 /// Verify that the provided path points to an existing file
-pub fn is_file<T: Into<PathBuf>>(path: T) -> Result<PathBuf, std::io::Error>
+pub fn is_file<T: Into<PathBuf>>(path: T) -> Result<PathBuf>
     where PathBuf: From<T>
 {
     let path = exists(path)?;
@@ -36,7 +37,7 @@ pub fn is_file<T: Into<PathBuf>>(path: T) -> Result<PathBuf, std::io::Error>
 }
 
 /// Verify that the provided path has the corresponding extension
-pub fn has_right_extension<T: Into<PathBuf>>(path: T, ext: &str) -> Result<(), std::io::Error>
+pub fn has_right_extension<T: Into<PathBuf>>(path: T, ext: &str) -> Result<()>
     where PathBuf: From<T>
 {
     let path = is_file(path)?;
@@ -49,20 +50,20 @@ pub fn has_right_extension<T: Into<PathBuf>>(path: T, ext: &str) -> Result<(), s
     Ok(())
 }
 
-pub fn is_usm_file<T: Into<PathBuf>>(path: T) -> Result<(), std::io::Error>
+pub fn is_usm_file<T: Into<PathBuf>>(path: T) -> Result<()>
     where PathBuf: From<T>
 {
     has_right_extension(path, "usm")
 }
 
-pub fn is_hca_file<T: Into<PathBuf>>(path: T) -> Result<(), std::io::Error>
+pub fn is_hca_file<T: Into<PathBuf>>(path: T) -> Result<()>
     where PathBuf: From<T>
 {
     has_right_extension(path, "hca")
 }
 
 /// Verify that the path provided points to an existing directory
-pub fn is_dir<T: Into<PathBuf>>(path: T) -> Result<(), std::io::Error>
+pub fn is_dir<T: Into<PathBuf>>(path: T) -> Result<()>
     where PathBuf: From<T>
 {
     let path = exists(path)?;

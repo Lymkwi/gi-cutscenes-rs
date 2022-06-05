@@ -31,6 +31,7 @@ use std::path::{
 
 mod demux;
 mod filetypes;
+mod errors;
 mod tools;
 mod validate;
 mod version;

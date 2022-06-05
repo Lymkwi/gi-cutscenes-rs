@@ -1,5 +1,6 @@
 
-
+// The default for everything here is 0 (or 0.0)
+#[derive(Default)]
 struct USMInfo {
     sig: u32,
     data_size: u32,
@@ -9,21 +10,6 @@ struct USMInfo {
     data_type: u8,
     frame_time: u32,
     frame_rate: u32
-}
-
-impl Default for USMInfo {
-    fn default() -> Self {
-        Self {
-            sig: 0,
-            data_size: 0,
-            data_offset: 0,
-            padding_size: 0,
-            chno: 0,
-            data_type: 0,
-            frame_time: 0,
-            frame_rate: 0
-        }
-    }
 }
 
 #[allow(dead_code)]
@@ -115,7 +101,7 @@ impl USMFile {
 }
 
 impl Demuxable for USMFile {
-    fn demux(mut self, _video_extract: bool, _audio_extract: bool, _output: &Path) -> Result<(PathBuf, Vec<PathBuf>)> {
+    fn demux(mut self, _video_extract: bool, _audio_extract: bool, _output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
         let f = File::open(self.path.as_path())?;
         let mut file_size = f.metadata()?.len();
         let mut reader = BufReader::new(f);

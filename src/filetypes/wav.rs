@@ -119,4 +119,8 @@ impl WaveData {
 
         res
     }
+
+    fn set_data_size(&mut self, dsize: u32) {
+        self.data_size = dsize;
+    }
 }

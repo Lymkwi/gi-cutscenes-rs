@@ -67,7 +67,7 @@ pub struct HCAFile {
 }
 
 impl HCAFile {
-    pub fn new(path: PathBuf, key2: [u8; 4], key1: [u8; 4]) -> Result<Self> {
+    pub fn new(path: PathBuf, key2: [u8; 4], key1: [u8; 4]) -> GICSResult<Self> {
         let mut res = Self {
             filename: path,
             key1, key2,
@@ -84,12 +84,12 @@ impl HCAFile {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn read_header(&mut self) -> Result<()> {
+    fn read_header(&mut self) -> GICSResult<()> {
         if !self.filename.exists() {
-            return Err(Error::new(ErrorKind::NotFound, "Could not find file"));
+            return Err(GICSError::new("Could not find file"));
         }
         if self.filename.extension().unwrap().to_str().unwrap() != "hca" {
-            return Err(Error::new(ErrorKind::InvalidData, "File extension isn't HCA"));
+            return Err(GICSError::new("File extension isn't HCA"));
         }
         let mut fs: File = File::open(&self.filename)?;
 
@@ -111,7 +111,7 @@ impl HCAFile {
             self.hca_header.version = u16::from_be_bytes([hca_byte[4], hca_byte[5]]);
             self.hca_header.data_offset = u16::from_be_bytes([hca_byte[6], hca_byte[7]]);
         } else {
-            panic!("Wrong header!");
+            return Err(GICSError::new("unknown signature for version and data_offset block"));
         }
 
         let mut header: Vec<u8> = vec![0; usize::from(self.hca_header.data_offset)];
@@ -143,7 +143,7 @@ impl HCAFile {
             ]);
             header_offset += 16;
         } else {
-            panic!("Broken FMT header");
+            return Err(GICSError::new("Broken FMT header"));
         }
 
         sign = u32::from_le_bytes([
@@ -167,10 +167,10 @@ impl HCAFile {
             self.hca_header.comp_r08 = u32::from(header[header_offset + 0xD]);
 
             if !(self.hca_header.block_size >= 8 || self.hca_header.block_size == 0) {
-                panic!("Invalid block size");
+                return Err(GICSError::new("invalid block size during HCA header reading"));
             }
             if !(self.hca_header.comp_r01 <= self.hca_header.comp_r02 && self.hca_header.comp_r02 <= 0x1F) {
-                panic!("Incorrect comp values");
+                return Err(GICSError::new("invalid comp register (1 and 2) values found during HCA header reading"));
             }
             header_offset += 16;
         } else if sign == 0x0063_6564 {
@@ -192,15 +192,15 @@ impl HCAFile {
             self.hca_header.comp_r07 = self.hca_header.comp_r05 - self.hca_header.comp_r06;
             self.hca_header.comp_r08 = 0;
             if !(self.hca_header.block_size >= 8 || self.hca_header.block_size == 0) {
-                panic!("Invalid block_size");
+                return Err(GICSError::new("invalid block size found during HCA header reading"));
             }
             if !(self.hca_header.comp_r01 <= self.hca_header.comp_r02 && self.hca_header.comp_r02 <= 0x1F) {
-                panic!("Invalid comp values");
+                return Err(GICSError::new("invalid comp register (1 and 2) values found during HCA header reading"));
             }
             if self.hca_header.comp_r03 == 0 { self.hca_header.comp_r01 = 1; }
             header_offset += 12;
         } else {
-            panic!("Invalid field");
+            return Err(GICSError::new("Invalid field"));
         }
 
 
@@ -251,7 +251,7 @@ impl HCAFile {
                 header[header_offset + 4], header[header_offset + 5]
             ]);
             if !(self.hca_header.cipher_type == 0 || self.hca_header.cipher_type == 1 || self.hca_header.cipher_type == 0x38) {
-                panic!("Invalid cipher type");
+                return Err(GICSError::new("Invalid cipher type found during HCA header reading"));
             }
         } else {
             self.hca_header.cipher_type = 0;
@@ -297,14 +297,14 @@ impl HCAFile {
         self.data = vec![0; data_size];
         fs.read_exact(&mut self.data)?;
 
-        self.ath_init();
+        self.ath_init()?;
         self.init_mask(self.hca_header.cipher_type);
 
         if self.hca_header.comp_r03 == 0 {
             self.hca_header.comp_r03 = 1;
         }
 
-        self.channel_init();
+        self.channel_init()?;
 
         self.header.clear();
         self.header.extend(header);
@@ -319,14 +319,14 @@ impl HCAFile {
         }
     }
 
-    fn channel_init(&mut self) {
+    fn channel_init(&mut self) -> GICSResult<()> {
         self.hca_channel = Vec::new();
         for _ in 0..self.hca_header.channel_count {
             self.hca_channel.push(Channel::new());
         }
 
         if !(self.hca_header.comp_r01 == 1 && self.hca_header.comp_r02 == 15) {
-            panic!("Comp values invalid");
+            return Err(GICSError::new("Comp register values 1 and 2 invalid for channel initialization"));
         }
 
         self.hca_header.comp_r09 = Self::reformulate(
@@ -386,6 +386,7 @@ impl HCAFile {
             self.hca_channel[index].value_3i = self.hca_header.comp_r06 + self.hca_header.comp_r07;
             self.hca_channel[index].count = self.hca_header.comp_r06 + (if r[index] == 2 { 0 } else { self.hca_header.comp_r07 });
         }
+        Ok(())
     }
 
     fn init_mask(&mut self, tp: u16) {
@@ -469,10 +470,11 @@ impl HCAFile {
         table
     }
 
-    fn ath_init(&mut self) {
+    fn ath_init(&mut self) -> GICSResult<()> {
         match self.hca_header.ath_type {
             0 => {
                 self.ath_table = [0; 0x80];
+                Ok(())
             },
             1 => {
                 let list: [u8; 656] = [
@@ -526,13 +528,14 @@ impl HCAFile {
                         for insertron in i..0x80 {
                             self.ath_table[insertron] = 0xFF;
                         }
-                        return;
+                        return Ok(());
                     }
                     self.ath_table[i] = list[index];
                     v += self.hca_header.sampling_rate as usize;
                 }
+                Ok(())
             },
-            _ => { panic!("What kind of ATH table are you using, dear?"); }
+            _ => { Err(GICSError::new("ATH table kind unknown. What kind of ATH table are you using, dear?")) }
         }
     }
 
@@ -563,7 +566,7 @@ impl HCAFile {
         sum
     }
 
-    pub fn convert_to_wav(mut self, path: &Path) -> Result<()> {
+    pub fn convert_to_wav(mut self, path: &Path) -> GICSResult<()> {
         // Some definitions
         let volume = 1.0;
         let mode = 16;
@@ -580,7 +583,7 @@ impl HCAFile {
         // Fill in wav sample
         let wav_simp = WaveSample::default();
         let mut wav_data = WaveData::default();
-        wav_data.data_size = self.hca_header.block_count * 0x80 * 8 * u32::from(wav_riff.fmt_sampling_size) + (wav_simp.loop_end - wav_simp.loop_start) * loop_flag;
+        wav_data.set_data_size(self.hca_header.block_count * 0x80 * 8 * u32::from(wav_riff.fmt_sampling_size) + (wav_simp.loop_end - wav_simp.loop_start) * loop_flag);
         wav_riff.riff_size = 0x1C + 8 + wav_data.data_size; // 8 is std::mem::size_of::<WaveData>()
 
         // We do not consider wave samples here, Genshin does not need to have any for the HCA to WAV conversion
@@ -624,7 +627,7 @@ impl HCAFile {
                             0x18 => (f * f64::from(0x0080_0000 - 1)).trunc(), // 24 bits
                             0x20 => (f * f64::from(i32::MAX)).trunc(), // 32 bits
                             _ => {
-                                panic!("Mode not supported: {}", mode);
+                                return Err(GICSError::new("Mode not supported: {}"));
                             }
                         } as i32;
                         /*if f != 0.0 {

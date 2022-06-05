@@ -1,18 +1,21 @@
-use std::{
-    io::{Error, ErrorKind},
-    path::{
-        Path,
-        PathBuf
+use std::path::{
+    Path,
+    PathBuf
+};
+
+use crate::{
+    errors::{
+        GICSError,
+        GICSResult
+    },
+    filetypes::{
+        HCAFile,
+        USMFile
     }
 };
 
-use crate::filetypes::{
-    HCAFile,
-    USMFile
-};
-
 pub trait Demuxable {
-    fn demux(self, video_extract: bool, audio_extract: bool, output: &Path) -> std::io::Result<(PathBuf, Vec<PathBuf>)>;
+    fn demux(self, video_extract: bool, audio_extract: bool, output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)>;
 }
 
 use crate::version;
@@ -59,7 +62,7 @@ fn find_key(filename: &str, version_keys: &[version::Data]) -> u64
     }
 }
 
-pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: &Path) -> Result<(), Error> {
+pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: &Path) -> GICSResult<()> {
     // Step 1 : What is the file name ?
     let filename: String = file.file_name().unwrap().to_str().unwrap().into();
     // Step 2 : Do we have keys ?
@@ -69,7 +72,7 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
             match version_keys {
                 Some(v) => split_key(find_key(&filename, &v)),
                 None => {
-                    return Err(Error::new(ErrorKind::NotFound, "No keys provided, and no version keyfile provided"));
+                    return Err(GICSError::new("No keys provided, and no version keyfile provided"));
                 }
             }
             
