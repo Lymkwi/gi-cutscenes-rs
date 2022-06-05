@@ -59,15 +59,6 @@ fn find_key(filename: &str, version_keys: &[version::Data]) -> u64
     }
 }
 
-fn key_array(key: u32) -> [u8; 4] {
-    [
-        ((key >> 24) & 0xFF).try_into().unwrap(),
-        ((key >> 16) & 0xFF).try_into().unwrap(),
-        ((key >>  8) & 0xFF).try_into().unwrap(),
-        (key & 0xFF).try_into().unwrap()
-    ]
-}
-
 pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: &Path) -> Result<(), Error> {
     // Step 1 : What is the file name ?
     let filename: String = file.file_name().unwrap().to_str().unwrap().into();

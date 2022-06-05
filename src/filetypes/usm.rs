@@ -26,6 +26,7 @@ impl Default for USMInfo {
     }
 }
 
+#[allow(dead_code)]
 pub struct USMFile {
     filename: String,
     path: PathBuf,

@@ -71,7 +71,7 @@ impl Channel {
             let mut v1 = data.get_bit(6);
             let v2 = (1 << v) - 1;
             let v3 = v2 >> 1;
-            let mut v4 = 0;
+            let mut v4;
             self.value[0] = v1 as i8;
             for i in 1..self.count {
                 v4 = data.get_bit(v);
@@ -552,10 +552,6 @@ impl ClData {
             size: size * 8 - 16,
             bit: 0
         }
-    }
-
-    fn get_data(&self) -> &[i32] {
-        &self.data
     }
 
     fn check_bit(&self, bit_size: i32) -> i32 {

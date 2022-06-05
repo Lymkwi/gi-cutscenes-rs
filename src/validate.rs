@@ -61,12 +61,6 @@ pub fn is_hca_file<T: Into<PathBuf>>(path: T) -> Result<(), std::io::Error>
     has_right_extension(path, "hca")
 }
 
-pub fn is_json_file<T: Into<PathBuf>>(path: T) -> Result<(), std::io::Error>
-    where PathBuf: From<T>
-{
-    has_right_extension(path, "json")
-}
-
 /// Verify that the path provided points to an existing directory
 pub fn is_dir<T: Into<PathBuf>>(path: T) -> Result<(), std::io::Error>
     where PathBuf: From<T>

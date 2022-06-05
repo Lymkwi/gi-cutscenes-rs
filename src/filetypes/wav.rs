@@ -52,6 +52,7 @@ impl WaveRiff {
     }
 }
 
+#[allow(dead_code)]
 struct WaveSample {
     smpl: [u8; 4],
     smpl_size: u32,
