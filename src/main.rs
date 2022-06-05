@@ -17,6 +17,10 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::missing_crate_level_docs)]
 
+// Everything allowed here will go because it's bad number type management
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+
 //#![allow(dead_code)]
 
 use clap::{

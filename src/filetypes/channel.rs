@@ -103,7 +103,8 @@ impl Channel {
         for i in 0..self.count {
             v = i32::from(self.value[i as usize]);
             if v != 0 {
-                v = i32::from(ath_table[i as usize]) + ((b + (i as i32)) >> 8) - v * 5 / 2 + 1;
+                let signed_index: i32 = i.try_into().unwrap();
+                v = i32::from(ath_table[i as usize]) + ((b + signed_index) >> 8) - v * 5 / 2 + 1;
                 if v < 0 {
                     v = 15;
                 } else if v >= 0x39 {
@@ -157,18 +158,23 @@ impl Channel {
         (0..self.count).for_each(|i| {
             let index: usize = i as usize;
 
-            let s: isize = self.scale[index].try_into().unwrap();
+            let s: i32 = i32::from(self.scale[index]);
             let bit_size = list1[s as usize];
-            let mut v = data.get_bit(i32::from(bit_size)) as isize;
+            let mut v = data.get_bit(i32::from(bit_size));
             let f: f32 = if s < 8 {
-                let shifted: isize = s << 4;
+                let shifted = s << 4;
                 v += shifted;
                 data.add_bit(i32::from(list2[v as usize] - bit_size));
                 list3[v as usize]
             } else {
-                v = (1 - ((v & 1) << 1)) * (v / 2);
-                if v == 0 { data.add_bit(-1); }
-                v as f32
+                let bitshifted: i16 = ((1 - ((v & 1) << 1)) * (v / 2)).try_into().unwrap();
+                if v == 0 {
+                    data.add_bit(-1);
+                    0.0_f32
+                } else {
+                    // bitshifted is always in the range that an i16 can represent
+                    f32::from(bitshifted)
+                }
             };
 
             self.block[index] = self.base_table[index] * f;
