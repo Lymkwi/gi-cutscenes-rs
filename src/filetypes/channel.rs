@@ -160,7 +160,7 @@ impl Channel {
             let s: isize = self.scale[index].try_into().unwrap();
             let bit_size = list1[s as usize];
             let mut v = data.get_bit(bit_size as i32) as isize;
-            let f: f32 = if s < 0 {
+            let f: f32 = if s < 8 {
                 let shifted: isize = (s << 4).try_into().unwrap();
                 v += shifted;
                 data.add_bit((list2[v as usize] - bit_size) as i32);
@@ -421,9 +421,11 @@ impl Channel {
 
                     data_table[d1] = b + a;
                     data_table[d2] = a - b;
+                    d1 += 1;
+                    d2 += 1;
                 });
-                d1 += 1;
-                d2 += 1;
+                d1 += count2;
+                d2 += count2;
             });
             let w = s - 0x80;
             let w_table: &mut [f32] = self_table;

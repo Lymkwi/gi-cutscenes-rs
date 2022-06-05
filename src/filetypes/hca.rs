@@ -67,7 +67,7 @@ pub struct HCAFile {
 }
 
 impl HCAFile {
-    pub fn new(path: PathBuf, key1: [u8; 4], key2: [u8; 4]) -> Result<Self> {
+    pub fn new(path: PathBuf, key2: [u8; 4], key1: [u8; 4]) -> Result<Self> {
         let mut res = Self {
             filename: path,
             key1, key2,
@@ -96,7 +96,7 @@ impl HCAFile {
         fs.read_exact(&mut hca_byte)?;
 
         let mut sign = u32::from_le_bytes([hca_byte[0], hca_byte[1], hca_byte[2], hca_byte[3]]) & 0x7F7F7F7F;
-        let magic = if sign == 0x00144348 {
+        let magic = if sign == 0x00414348 {
             self.encrypted = true;
             0x7F7F7F7F
         } else {
@@ -635,7 +635,8 @@ impl HCAFile {
                         /*if f != 0.0 {
                             println!("{} -> {}", f, v);
                         }*/
-                        wav_file.write(&v.to_le_bytes())?;
+                        let max_bytes = usize::from(mode / 0x08);
+                        wav_file.write(&v.to_le_bytes()[0..max_bytes])?;
                     }
                 }
             }
@@ -672,7 +673,7 @@ impl HCAFile {
                         self.hca_header.comp_r05
                     )
             );
-            (0..channel_count).for_each(|j| {
+            (0..channel_count-1).for_each(|j| {
                 //let chan = &mut self.hca_channel[1];
                 // I have to return here because I can't borrow the array of channels and
                 // The first channel as mutable at once

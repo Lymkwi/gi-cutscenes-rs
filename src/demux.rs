@@ -88,7 +88,7 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
     let file: USMFile = USMFile::new(file, key2.to_le_bytes(), key1.to_le_bytes());
     let (_video_path, audio_path_vec) = file.demux(true, true, output.as_path())?;
     for audio_path in audio_path_vec {
-        let audio_file: HCAFile = HCAFile::new(audio_path.clone(), key_array(key2), key_array(key1))?;
+        let audio_file: HCAFile = HCAFile::new(audio_path.clone(), key2.to_le_bytes(), key1.to_le_bytes())?;
         audio_file.convert_to_wav(&audio_path)?;
     }
     Ok(())
