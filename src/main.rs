@@ -63,7 +63,7 @@ fn main() {
         .takes_value(true)
         .default_value("version.json");
     let args = Command::new("GI Cutscenes")
-        .version("0.0.1")
+        .version("0.0.2")
         .author("Lux A. Phifollen <limefox@vulpinecitrus.info>")
         .about("Command-line utility to extract and demux GI cutscenes")
         // See https://users.rust-lang.org/t/clap-how-to-group-require-top-level-subcommands/24789
@@ -112,9 +112,7 @@ fn main() {
                     .takes_value(true)
                     .validator(|s| validate::is_dir(s))
                     .value_hint(ValueHint::DirPath))
-                .arg(version_json
-                    // Only validate here because we actually need the file
-                    .validator(|s| validate::is_file(s)))
+                .arg(version_json)
                 .arg(subs_option)
                 .arg(merge_option)
                 .arg(ffmpeg_option)
