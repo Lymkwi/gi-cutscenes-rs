@@ -194,7 +194,11 @@ fn main() {
             }
             let (v_path, a_paths): (PathBuf, Vec<PathBuf>) = res.unwrap();
             if merge {
-                if let Err(e) = filetypes::MKV::attempt_merge(output, v_path, a_paths, ffmpeg_path) {
+                if let Err(e) = filetypes::MKVFile::attempt_merge(
+                    output,
+                    v_path.as_path(),
+                    &a_paths.iter().map(PathBuf::as_path).collect::<Vec<&Path>>(),
+                    ffmpeg_path) {
                     eprintln!("Error trying to merge output files : {}", e);
                 }
             }

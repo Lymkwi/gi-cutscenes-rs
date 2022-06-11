@@ -1,4 +1,4 @@
-pub struct MKV {
+pub struct MKVFile {
     outpath: PathBuf,
     merge_binary: PathBuf,
     command: Command
@@ -15,9 +15,9 @@ const GENSHIN_LANGUAGE_ORDER: [(&str, &str); 4] = [
     ("kor", "Korean (한국어)")
 ];
 
-impl MKV {
-    pub fn attempt_merge(out_path: PathBuf, v_path: PathBuf, a_paths: Vec<PathBuf>, ffmpeg_path: &str) -> GICSResult<()> {
-        let mut russian_doll = MKV::new(out_path, v_path, a_paths, ffmpeg_path)?;
+impl MKVFile {
+    pub fn attempt_merge(out_path: PathBuf, v_path: &Path, a_paths: &[&Path], ffmpeg_path: &str) -> GICSResult<()> {
+        let mut russian_doll = Self::new(out_path, v_path, a_paths, ffmpeg_path);
         let status = russian_doll.command.status()?;
         if status.success() {
             Ok(())
@@ -26,7 +26,7 @@ impl MKV {
         }
     }
 
-    fn new(out_path: PathBuf, v_path: PathBuf, a_paths: Vec<PathBuf>, ffmpeg_path: &str) -> GICSResult<Self> {
+    fn new(out_path: PathBuf, v_path: &Path, a_paths: &[&Path], ffmpeg_path: &str) -> Self {
         // Build an argument vector
         let mut input_arguments: Vec<String> = vec!["-i".into(), v_path.to_str().unwrap().into()];
         let mut map_arguments: Vec<String> = vec!["-map".into(), "0:v".into()];
@@ -62,18 +62,18 @@ impl MKV {
             .args(merge_arguments)
             .arg(out_path.to_str().unwrap());
 
-        Ok(Self {
+        Self {
             outpath: out_path,
             merge_binary: PathBuf::from(ffmpeg_path),
             command: cmd
-        })
+        }
     }
 
     pub fn get_outpath(&self) -> &Path {
         self.outpath.as_path()
     }
 
-    pub fn get_command(&self) -> &Command {
+    pub const fn get_command(&self) -> &Command {
         &self.command
     }
 }
