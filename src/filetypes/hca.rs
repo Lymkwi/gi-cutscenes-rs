@@ -566,7 +566,7 @@ impl HCAFile {
         sum
     }
 
-    pub fn convert_to_wav(mut self, path: &Path) -> GICSResult<()> {
+    pub fn convert_to_wav(mut self, path: &Path) -> GICSResult<PathBuf> {
         // Some definitions
         let volume = 1.0;
         let mode = 16;
@@ -597,7 +597,7 @@ impl HCAFile {
         println!("Writing to {}", wav_path.to_str().unwrap());
 
         // Start to write the actual wav file
-        let mut wav_file: File = File::create(wav_path)?;
+        let mut wav_file: File = File::create(&wav_path)?;
         wav_file.write_all(&header)?;
 
         self.hca_header.volume *= volume;
@@ -644,7 +644,7 @@ impl HCAFile {
         // Flush and close
         wav_file.flush()?;
 
-        Ok(())
+        Ok(wav_path)
     }
 
     fn decode_block(&mut self, data: &mut [u8]) {

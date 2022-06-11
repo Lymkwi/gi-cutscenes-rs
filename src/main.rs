@@ -50,6 +50,12 @@ fn main() {
         .short('m')
         .long("merge")
         .help("Merges the extracted content into a MKV container file");
+    let ffmpeg_option = Arg::new("merge-program")
+        .short('p')
+        .long("merge-program")
+        .takes_value(true)
+        .default_value("ffmpeg")
+        .help("Path to the ffmpeg binary used to merge the output files");
     let version_json = Arg::new("version-keys")
         .short('k')
         .long("version-keys")
@@ -93,6 +99,7 @@ fn main() {
                 .arg(version_json.clone())
                 .arg(subs_option.clone())
                 .arg(merge_option.clone())
+                .arg(ffmpeg_option.clone())
         )
         .subcommand(
             Command::new("batchDemux")
@@ -110,6 +117,7 @@ fn main() {
                     .validator(|s| validate::is_file(s)))
                 .arg(subs_option)
                 .arg(merge_option)
+                .arg(ffmpeg_option)
         )
         .subcommand(
             Command::new("convertHca")
@@ -147,6 +155,7 @@ fn main() {
             let key_2: Option<u32> = cmd.value_of("key2").map(|s| u32::from_str_radix(s, 16).unwrap());
             let subs: bool = cmd.is_present("subs");
             let merge: bool = cmd.is_present("merge");
+            let ffmpeg_path: &str = cmd.value_of("merge-program").unwrap();
             let output: PathBuf = args.value_of("output")
                 // No need to re-validate since we know the file is good, its folder must be too
                 .map_or_else(
@@ -178,7 +187,17 @@ fn main() {
                 file.to_str().unwrap(),
                 output.to_str().unwrap(),
                 key_1, key_2, version_file, subs, merge, cleanup);
-            let _res = demux::process_file(file, version_keys, key_2, key_1, output.as_path());
+            let res = demux::process_file(file, version_keys, key_2, key_1, output.as_path());
+            if let Err(e) = res {
+                eprintln!("Error while demuxing : {}", e);
+                return;
+            }
+            let (v_path, a_paths): (PathBuf, Vec<PathBuf>) = res.unwrap();
+            if merge {
+                if let Err(e) = filetypes::MKV::attempt_merge(output, v_path, a_paths, ffmpeg_path) {
+                    eprintln!("Error trying to merge output files : {}", e);
+                }
+            }
         },
         Some(("batchDemux", cmd)) => {
             // Start to extract the arguments

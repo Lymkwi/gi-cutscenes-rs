@@ -62,7 +62,7 @@ fn find_key(filename: &str, version_keys: &[version::Data]) -> u64
     }
 }
 
-pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: &Path) -> GICSResult<()> {
+pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
     // Step 1 : What is the file name ?
     let filename: String = file.file_name().unwrap().to_str().unwrap().into();
     // Step 2 : Do we have keys ?
@@ -80,10 +80,14 @@ pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key
     };
     println!("Keys derived for \"{}\" : ({:08X}, {:08X})", file.to_str().unwrap(), key2, key1);
     let file: USMFile = USMFile::new(file, key2.to_le_bytes(), key1.to_le_bytes());
-    let (_video_path, audio_path_vec) = file.demux(true, true, output)?;
-    for audio_path in audio_path_vec {
-        let audio_file: HCAFile = HCAFile::new(audio_path.clone(), key2.to_le_bytes(), key1.to_le_bytes())?;
-        audio_file.convert_to_wav(&audio_path)?;
-    }
-    Ok(())
+    let (video_path, audio_path_vec) = file.demux(true, true, output)?;
+
+    // Later on, these paths will be used to merge everything together
+    Ok((
+        video_path,
+        audio_path_vec.into_iter().map(|audio_path| {
+            let audio_file: HCAFile = HCAFile::new(audio_path.clone(), key2.to_le_bytes(), key1.to_le_bytes())?;
+            audio_file.convert_to_wav(&audio_path)
+        }).collect::<GICSResult<Vec<PathBuf>>>()?
+    ))
 }
