@@ -592,9 +592,7 @@ impl HCAFile {
         header.extend(wav_data.build_byte_array());
 
         // Build a path to the wav file
-        let mut wav_path = PathBuf::from(path); // ugly clone
-        wav_path.set_extension("wav");
-        println!("Writing to {}", wav_path.to_str().unwrap());
+        let wav_path = PathBuf::from(path);
 
         // Start to write the actual wav file
         let mut wav_file: File = File::create(&wav_path)?;

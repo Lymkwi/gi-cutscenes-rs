@@ -101,24 +101,39 @@ impl USMFile {
 }
 
 impl Demuxable for USMFile {
-    fn demux(mut self, video_extract: bool, audio_extract: bool, _output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
+    fn demux(mut self, video_extract: bool, audio_extract: bool, output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
         let f = File::open(self.path.as_path())?;
         let mut file_size = f.metadata()?.len();
         let mut reader = BufReader::new(f);
         let mut info: USMInfo = USMInfo::default();
 
+        // Base output folder
+        let base_output = PathBuf::from(output);
+        // Try and create it
+        if !base_output.is_dir() {
+            // We check with is dir because if the path exists and is a file/socket/etc
+            // it's also going to crash and be handled here
+            std::fs::create_dir_all(base_output.as_path())?;
+        }
+
+        // Base file name
+        let base_name = self.path.file_name().ok_or_else(|| GICSError::new("USM Path has no file name"))?;
+
         // Video output
-        let mut video_path = PathBuf::from(self.path.as_path());
+        let mut video_path = base_output.clone();
+        video_path.push(base_name);
         video_path.set_extension("ivf");
         let mut video_output = BufWriter::new(File::create(video_path.as_path())?);
 
         // Audio outputs
-        let audio_path = PathBuf::from(self.path.as_path());
-        let audio_base_name: String = audio_path.file_stem().unwrap().to_str().unwrap().into();
+        let audio_path = base_output.clone();
+        // The extension is set later
+        let audio_base_name: String = self.path
+            .file_stem().ok_or_else(|| GICSError::new("USM path has no file stem"))?
+            .to_str().ok_or_else(|| GICSError::new("Unable to decode USM file stem to UTF-8"))?
+            .into();
         let mut audio_writers: HashMap<u8, BufWriter<_>> = HashMap::new();
         let mut audio_files: Vec<PathBuf> = Vec::new();
-
-        //let mut audio_output = BufWriter::new(File::create(audio_path.as_path())?);
 
         while file_size > 0 {
             // Read 32 bits at a time
@@ -166,7 +181,7 @@ impl Demuxable for USMFile {
                         if let std::collections::hash_map::Entry::Vacant(e) = audio_writers.entry(info.chno) {
                             let filename = format!("{}_{}.hca", audio_base_name, info.chno);
                             let mut path = audio_path.clone();
-                            path.set_file_name(filename);
+                            path.push(filename);
                             audio_files.push(path.clone());
                             e.insert(BufWriter::new(File::create(path)?));
                         }

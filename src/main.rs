@@ -42,6 +42,22 @@ mod version;
 
 #[allow(clippy::too_many_lines)]
 fn main() {
+    let key1 = Arg::new("key1")
+        .short('a')
+        .long("key1")
+        .value_name("key1")
+        .help("4 lower bytes of the key")
+        .takes_value(true)
+        .validator(|s| u32::from_str_radix(s, 16))
+        .value_hint(ValueHint::Other);
+    let key2 = Arg::new("key2")
+        .short('b')
+        .long("key2")
+        .value_name("key2")
+        .help("4 higher bytes of the key")
+        .takes_value(true)
+        .validator(|s| u32::from_str_radix(s, 16))
+        .value_hint(ValueHint::Other);
     let subs_option = Arg::new("subs")
         .short('s')
         .long("subtitles")
@@ -80,22 +96,8 @@ fn main() {
                     .takes_value(true)
                     .value_hint(ValueHint::FilePath)
                     .validator(|s| validate::is_usm_file(s)))
-                .arg(Arg::new("key1")
-                    .short('a')
-                    .long("key1")
-                    .value_name("key1")
-                    .help("4 lower bytes of the key")
-                    .takes_value(true)
-                    .validator(|s| u32::from_str_radix(s, 16))
-                    .value_hint(ValueHint::Other))
-                .arg(Arg::new("key2")
-                    .short('b')
-                    .long("key2")
-                    .value_name("key2")
-                    .help("4 higher bytes of the key")
-                    .takes_value(true)
-                    .validator(|s| u32::from_str_radix(s, 16))
-                    .value_hint(ValueHint::Other))
+                .arg(key1.clone())
+                .arg(key2.clone())
                 .arg(version_json.clone())
                 .arg(subs_option.clone())
                 .arg(merge_option.clone())
@@ -112,7 +114,7 @@ fn main() {
                     .takes_value(true)
                     .validator(|s| validate::is_dir(s))
                     .value_hint(ValueHint::DirPath))
-                .arg(version_json)
+                .arg(version_json.clone())
                 .arg(subs_option)
                 .arg(merge_option)
                 .arg(ffmpeg_option)
@@ -128,6 +130,16 @@ fn main() {
                     .takes_value(true)
                     .validator(|s| validate::is_hca_file(s))
                     .value_hint(ValueHint::FilePath))
+                .arg(Arg::new("basename")
+                    .short('n')
+                    .long("base-name")
+                    .value_name("base_name")
+                    .help("Base name of the file (to find its cutscene in versions.json)")
+                    .takes_value(true)
+                )
+                .arg(key1)
+                .arg(key2)
+                .arg(version_json)
         )
         .arg(Arg::new("output")
              .short('o')
@@ -141,7 +153,6 @@ fn main() {
             .help("Keeps the extracted files instead of removing them"))
         .get_matches();
 
-    println!("{:?}", args.subcommand());
     let cleanup: bool = !args.is_present("no-cleanup");
 
     match args.subcommand() {
@@ -149,30 +160,38 @@ fn main() {
             // Start to extract the arguments
             // Clap already validated the paths and the key values if any
             let file: PathBuf = PathBuf::from(cmd.value_of("demux-file").unwrap());
-            let key_1: Option<u32> = cmd.value_of("key1").map(|s| u32::from_str_radix(s, 16).unwrap());
-            let key_2: Option<u32> = cmd.value_of("key2").map(|s| u32::from_str_radix(s, 16).unwrap());
-            let subs: bool = cmd.is_present("subs");
+            let basename: String = file
+                .file_name().expect("No file name in the provided path")
+                .to_str().expect("Unable to decode path name into UTF-8")
+                .into();
+            let key_one: Option<u32> = cmd.value_of("key1").map(|s| u32::from_str_radix(s, 16).unwrap());
+            let key_two: Option<u32> = cmd.value_of("key2").map(|s| u32::from_str_radix(s, 16).unwrap());
+            let subs: bool = cmd.is_present("subs"); // This will become a path later
             let merge: bool = cmd.is_present("merge");
             let ffmpeg_path: &str = cmd.value_of("merge-program").unwrap();
             let output: PathBuf = args.value_of("output")
                 // No need to re-validate since we know the file is good, its folder must be too
                 .map_or_else(
-                    // If we do not get an output folder (or it's invalid), place the output alongside our input file
-                    || file.parent().unwrap_or_else(|| Path::new("/")).into(),
+                    // If we do not get an output file, place the output alongside our input file
+                    || {
+                        let mut def = file.clone();
+                        def.set_extension("mkv");
+                        def
+                    },
                     // If we do, attempt to get a path from it
                     PathBuf::from
                 );
 
             // We haven't validated the file here
             let version_file: &str = cmd.value_of("version-keys").unwrap();
-            let version_keys: Option<Vec<version::Data>> = if key_1.is_none() || key_2.is_none() {
+            let version_keys: Option<Vec<version::Data>> = if key_one.is_none() || key_two.is_none() {
                     // Let's validate that the file exists
                     if let Err(e) = validate::is_file(version_file) {
                         eprintln!("Error opening version keys file : {}", e);
                         return;
                     }
                     match version::read_version_file(PathBuf::from(version_file)) {
-                        Ok(keys) => Some(keys),
+                        Ok(keydata) => Some(keydata),
                         Err(e) => {
                             eprintln!("Error reading key file : {}", e);
                             return;
@@ -180,26 +199,13 @@ fn main() {
                     }
                 } else { None };
 
-            // Function call will be added later
-            println!("FileDemux: file: {}, output: {}, key1: {:?}, key2: {:?}, version file: {:?}, subs: {}, merge: {}, cleanup: {}",
-                file.to_str().unwrap(),
-                output.to_str().unwrap(),
-                key_1, key_2, version_file, subs, merge, cleanup);
-            let res = demux::process_file(file, version_keys, key_2, key_1, output.as_path());
+            let (key_two, key_one) = version::definite_version_keys(&basename, version_keys.as_deref(), key_one, key_two).unwrap();
+            println!("Keys derived for \"{}\" : ({:08X}, {:08X})", file.to_str().unwrap(), key_two, key_one);
+            let res = demux::process_file(file, key_two, key_one, output.as_path(), merge, cleanup, subs, ffmpeg_path);
             if let Err(e) = res {
-                eprintln!("Error while demuxing : {}", e);
-                return;
+                eprintln!("Error: {}", e);
             }
-            let (v_path, a_paths): (PathBuf, Vec<PathBuf>) = res.unwrap();
-            if merge {
-                if let Err(e) = filetypes::MKVFile::attempt_merge(
-                    output,
-                    v_path.as_path(),
-                    &a_paths.iter().map(PathBuf::as_path).collect::<Vec<&Path>>(),
-                    ffmpeg_path) {
-                    eprintln!("Error trying to merge output files : {}", e);
-                }
-            }
+
         },
         Some(("batchDemux", cmd)) => {
             // Start to extract the arguments
@@ -207,6 +213,7 @@ fn main() {
             let folder: PathBuf = PathBuf::from(cmd.value_of("usm-folder").unwrap());
             let subs: bool = cmd.is_present("subs");
             let merge: bool = cmd.is_present("merge");
+            let ffmpeg_path: &str = cmd.value_of("merge-program").unwrap();
             let output: PathBuf = args.value_of("output")
                 // No need to re-validate since we know the file is good, its folder must be too
                 .map_or_else(
@@ -217,38 +224,68 @@ fn main() {
                 );
 
             // We haven't validated this json, we need to. We just know it's a file that exists
-            let version_keys: Vec<version::Data> = match version::read_version_file(cmd.value_of("version-keys").unwrap())
-            {
-                Ok(good) => good,
+            let version_file: &str = cmd.value_of("version-keys").unwrap();
+            let version_keys: Vec<version::Data> = match version::read_version_file(PathBuf::from(version_file)) {
+                Ok(keydata) => keydata,
                 Err(e) => {
-                    eprintln!("Error opening version keys file: {}", e);
+                    eprintln!("Error reading key file : {}", e);
                     return;
                 }
             };
 
-            println!("FileDemux: folder: {}, output: {}, version file: {}, subs: {}, merge: {}, cleanup: {}",
-                folder.to_str().unwrap(),
-                output.to_str().unwrap(),
-                version_keys.len(),
-                subs, merge, cleanup);
+            // Start working through the directory..
+            if let Err(e) = demux::process_directory(folder, &version_keys, output.as_path(), merge, cleanup, subs, ffmpeg_path) {
+                eprintln!("Error: {}", e);
+            }
         },
         Some(("convertHca", cmd)) => {
             // Start to extract the arguments
             // Clap already validated the paths and the key values if any
             let file: PathBuf = PathBuf::from(cmd.value_of("hca-input").unwrap());
+            let basename: &str = cmd.value_of("basename")
+                .unwrap_or_else(||
+                    file
+                        .file_name().expect("No file name in the provided path")
+                        .to_str().expect("Unable to decode path name into UTF-8")
+                );
             let output: PathBuf = args.value_of("output")
                 // No need to re-validate since we know the file is good, its folder must be too
                 .map_or_else(
-                    // If we do not get an output folder (or it's invalid), place the output alongside our input file
-                    || file.parent().unwrap_or_else(|| Path::new("/")).into(),
+                    // If we do not get an output file path (or it's invalid), place the output alongside our input file
+                    || {
+                        let mut def = file.clone();
+                        def.set_extension("wav");
+                        def
+                    },
                     // If we do, attempt to get a path from it
                     PathBuf::from
                 );
+            let key_one: Option<u32> = cmd.value_of("key1").map(|s| u32::from_str_radix(s, 16).unwrap());
+            let key_two: Option<u32> = cmd.value_of("key2").map(|s| u32::from_str_radix(s, 16).unwrap());
+            // We haven't validated the file here
+            let version_file: &str = cmd.value_of("version-keys").unwrap();
+            let version_keys: Option<Vec<version::Data>> = if key_one.is_none() || key_two.is_none() {
+                    // Let's validate that the file exists
+                    if let Err(e) = validate::is_file(version_file) {
+                        eprintln!("Error opening version keys file : {}", e);
+                        return;
+                    }
+                    match version::read_version_file(PathBuf::from(version_file)) {
+                        Ok(keydata) => Some(keydata),
+                        Err(e) => {
+                            eprintln!("Error reading key file : {}", e);
+                            return;
+                        }
+                    }
+                } else { None };
 
-            println!("FileDemux: folder: {}, output: {}, cleanup: {}",
-                file.to_str().unwrap(),
-                output.to_str().unwrap(),
-                cleanup);
+            // Get our keys
+            let (key_one, key_two) = version::definite_version_keys(basename, version_keys.as_deref(), key_one, key_two).unwrap();
+
+            // Convert
+            if let Err(e) = demux::process_hca(file, key_two, key_one, output.as_path(), cleanup) {
+                eprintln!("Error: {}", e);
+            }
         },
         _ => { eprintln!("No subcommand provided"); }
     }

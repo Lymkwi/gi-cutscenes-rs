@@ -39,6 +39,10 @@ The subcommands are :
     - `-s`/`--subtitles` : Flag to indicate we want to add the subtitles to the MKV file
  - `convertHca` : Convert a HCA file to WAV
     - `-i`/`--hca-input` : Path to the input HCA file
+    - `-a`/`--key1` : the 4 lower bytes of the decryption key (hexadecimal)
+    - `-b`/`--key2` : the 4 higher bytes of the encryption key (hexadecimal)
+    - `-k`/`--version-keys` : Path to the `versions.json` file (defaults to `./versions.json`)
+    - `-n`/`--base-name` : Base name to look for in the `versions.json` file to find keys
 
 ### TL;DR
 
@@ -56,7 +60,7 @@ Here are the most common commands :
 
 **Convert a HCA file to WAV**
 ```bash
-./gi-cutscenes-rs -o battlePass_0.wav convertHca -i battlePass_0.hca
+./gi-cutscenes-rs -o battlePass_0.wav convertHca -n battlePass -i battlePass_0.hca
 ```
 
 ## Build
@@ -73,9 +77,9 @@ cargo install --path .
 
 ## Roadmap
 
- - [X] Full pipeline of USM to (HCA + IFV) to (WAV + IFV) to MKV
+ - [X] Full pipeline of USM to (HCA + IVF) to (WAV + IVF) to MKV
  - [ ] Batch demux
- - [ ] Single HCA to WAV file
+ - [X] Single HCA to WAV file
  - [ ] Merging of sub files (obtainable in [Dimbreath's repository](https://github.com/Dimbreath/GenshinData/tree/master/Subtitle))
 
 ## License

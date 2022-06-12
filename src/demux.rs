@@ -10,7 +10,12 @@ use crate::{
     },
     filetypes::{
         HCAFile,
-        USMFile
+        USMFile,
+        MKVFile
+    },
+    version::{
+        definite_version_keys,
+        Data
     }
 };
 
@@ -18,76 +23,126 @@ pub trait Demuxable {
     fn demux(self, video_extract: bool, audio_extract: bool, output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)>;
 }
 
-use crate::version;
-
-// The intro cutscenes are not exactly encrypted, because the game needs to be able to play
-// Them without having downloaded all of the streaming assets
-const INTROS: [&str; 3] = [ "MDAQ001_OPNew_Part1.usm", "MDAQ001_OPNew_Part2_PlayerBoy.usm", "MDAQ001_OPNew_Part2_PlayerGirl.usm" ];
-
-fn split_key(key: u64) -> (u32, u32)
-{
-    ((key >> 32).try_into().unwrap(), (key & 0xffff_ffff).try_into().unwrap())
-}
-
-fn file_name_encryption_key(filename: &str) -> u64
-{
-    let filename: &str = if INTROS.contains(&filename) { "MDAQ001_OP" } else { filename };
-    // Now, get the front of the file without the extension
-    let basename: &str = filename.split('.').next().unwrap();
-    let mut sum: u64 = 0;
-
-    sum = basename.bytes().fold(sum, |acc, bt| 3 * acc + u64::from(bt));
-
-    sum &= 0xFF_FFFF_FFFF_FFFF;
-    if sum > 0 { sum } else { 0x100_0000_0000_0000 }
-}
-
-fn blk_encryption_key(filename: &str, _version_keys: &[version::Data]) -> u64
-{
-    let _basename: &str = filename.split('.').next().unwrap();
-    0
-}
-
-fn find_key(filename: &str, version_keys: &[version::Data]) -> u64
-{
-    let key1: u64 = file_name_encryption_key(filename);
-    //let (key2, bld) = blk_encryption_key(filename);
-    let key2: u64 = blk_encryption_key(filename, version_keys);
-
-    //if (key1 + key2 & 0xFF_FFFF_FFFF_FFFF) == 0 {
-    if (key1+key2).trailing_zeros() >= 56 {
-        0x100_0000_0000_0000
+fn output_paths_from(file: &Path, merge: bool, output: &Path) -> GICSResult<(PathBuf, PathBuf)> {
+    let dot = PathBuf::from(".");
+    let base_name = file
+        .file_name().ok_or_else(|| GICSError::new("Unable to retrieve input file base name"))?
+        .to_str().ok_or_else(|| GICSError::new("Unable to decode base name to UTF-8"))?;
+    let mut tentative_mkv = PathBuf::from(output);
+    let mut tentative_out = PathBuf::from(output);
+    if merge {
+        // The output has to have "MKV" as its extension, or be a directory
+        if output.extension().is_none() {
+            // Does it exist? Is it a directory?
+            if output.exists() {
+                if !output.is_dir() {
+                    return Err(GICSError::new("Output path is not a directory and exists"));
+                }
+            } else {
+                std::fs::create_dir_all(output)?;
+            }
+            tentative_mkv.push(base_name);
+            tentative_mkv.set_extension("mkv");
+        } else if output.extension().unwrap()
+            .to_str().ok_or_else(|| GICSError::new("File extension is not UTF-8"))?
+            != "mkv" {
+                return Err(GICSError::new("Merge option provided but output file name isn't a mkv file"))
+        } else {
+            // it has an MKV extension
+            tentative_out = PathBuf::from(tentative_out.parent().unwrap_or(dot.as_path()));
+        }
     } else {
-        (key1 + key2) & 0xFF_FFFF_FFFF_FFFF
+        // It has to be a directory, potentially create the output directories
+        if output.exists() {
+            if !output.is_dir() {
+                return Err(GICSError::new("Unable to treat the output as a directory"));
+            }
+        } else {
+            std::fs::create_dir_all(output)?;
+        }
+    }
+    Ok((tentative_out, tentative_mkv))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn process_file(file: PathBuf, key2: u32, key1: u32, output: &Path, merge: bool, cleanup: bool, _subs: bool, ffmpeg_path: &str) -> GICSResult<()> {
+    let (output_directory, mkv_output) = output_paths_from(file.as_path(), merge, output)?;
+
+    let file: USMFile = USMFile::new(file, key2.to_le_bytes(), key1.to_le_bytes());
+    let (video_path, audio_path_vec) = file.demux(true, true, output_directory.as_path())?;
+    println!("File demuxed. Collected one video and {} audio files.", audio_path_vec.len());
+
+    // Convert the HCAs right now
+    let a_paths = audio_path_vec.into_iter().enumerate().map(|(id, audio_path)| {
+            let basename: String = audio_path
+                .file_name().ok_or_else(|| GICSError::new("No file name in the provided path"))?
+                .to_str().ok_or_else(|| GICSError::new("Unable to decode path name into UTF-8"))?
+                .into();
+            let mut audio_output = output_directory.clone();
+            audio_output.push(&basename);
+            audio_output.set_extension("wav");
+            println!("Processing track #{}..", id);
+            process_hca(audio_path.clone(), key2, key1, audio_output.as_path(), cleanup)
+        }).collect::<GICSResult<Vec<PathBuf>>>()?;
+
+    if merge {
+        MKVFile::attempt_merge(
+            mkv_output,
+            video_path.as_path(),
+            &a_paths.iter().map(PathBuf::as_path).collect::<Vec<&Path>>(),
+            ffmpeg_path
+        )?;
+        if cleanup {
+            // Remove video
+            std::fs::remove_file(video_path)?;
+            a_paths.iter()
+                .map(|p| std::fs::remove_file(p).map_err(GICSError::from))
+                .collect::<GICSResult<Vec<()>>>()?;
+        }
+        Ok(())
+    } else {
+        Ok(())
     }
 }
 
-pub fn process_file(file: PathBuf, version_keys: Option<Vec<version::Data>>, key2: Option<u32>, key1: Option<u32>, output: &Path) -> GICSResult<(PathBuf, Vec<PathBuf>)> {
-    // Step 1 : What is the file name ?
-    let filename: String = file.file_name().unwrap().to_str().unwrap().into();
-    // Step 2 : Do we have keys ?
-    let (key2, key1) = match (key2, key1) {
-        (Some(k2), Some(k1)) => (k2, k1),
-        _ => {
-            match version_keys {
-                Some(v) => split_key(find_key(&filename, &v)),
-                None => {
-                    return Err(GICSError::new("No keys provided, and no version keyfile provided"));
-                }
-            }
-            
-        }
-    };
-    println!("Keys derived for \"{}\" : ({:08X}, {:08X})", file.to_str().unwrap(), key2, key1);
-    let file: USMFile = USMFile::new(file, key2.to_le_bytes(), key1.to_le_bytes());
-    let (video_path, audio_path_vec) = file.demux(true, true, output)?;
+pub fn process_hca(file: PathBuf, key2: u32, key1: u32, output: &Path, cleanup: bool) -> GICSResult<PathBuf> {
+    let audio_file: HCAFile = HCAFile::new(file.clone(), key2.to_le_bytes(), key1.to_le_bytes())?;
+    let outfile = audio_file.convert_to_wav(output)?;
+    if cleanup {
+        std::fs::remove_file(file)?;
+    }
+    Ok(outfile)
+}
 
-    // Later on, these paths will be used to merge everything together
-    Ok((
-        video_path,
-        audio_path_vec.into_iter().map(|audio_path| {
-            let audio_file: HCAFile = HCAFile::new(audio_path.clone(), key2.to_le_bytes(), key1.to_le_bytes())?;
-            audio_file.convert_to_wav(&audio_path)
-        }).collect::<GICSResult<Vec<PathBuf>>>()?
-    ))
+pub fn process_directory(folder: PathBuf, version_keys: &[Data], output: &Path, merge: bool, cleanup: bool, subs: bool, ffmpeg_path: &str) -> GICSResult<()> {
+    if output.exists() && !output.is_dir() {
+        println!("{:?}", output);
+        return Err(GICSError::new("Provided output path is not a directory; this would overwrite every result. Aborting"));
+    }
+    for entry in std::fs::read_dir(folder)? {
+        let path = entry?.path();
+        if !path.is_file() {
+            println!("Skipping file \"{}\"", path.to_str().ok_or_else(|| GICSError::new("Unable to decode file path to UTF-8"))?);
+            continue;
+        }
+        // File has to have an extension and be a USM
+        if path.extension().is_none()
+            || path.extension().unwrap().to_str().is_none()
+            || path.extension().unwrap().to_str().unwrap() != "usm" {
+                println!("Skipping file \"{}\"", path.to_str().ok_or_else(|| GICSError::new("Unable to decode file path to UTF-8"))?);
+                continue;
+        }
+        // Copy the entry name
+        let mut outpath = PathBuf::from(output);
+        let basename = path
+            .file_name().ok_or_else(|| GICSError::new("Unable to find base name of an entry"))?
+            .to_str().ok_or_else(|| GICSError::new("Unable to decode file name to UTF-8"))?;
+        outpath.push(basename);
+        outpath.set_extension("mkv");
+        // Find keys
+        let (key_two, key_one) = definite_version_keys(basename, Some(version_keys), None, None)?;
+        println!("Keys derived for \"{}\" : ({:08X}, {:08X})", basename, key_two, key_one);
+        process_file(path, key_two, key_one, outpath.as_path(), merge, cleanup, subs, ffmpeg_path)?;
+    }
+    Ok(())
 }
