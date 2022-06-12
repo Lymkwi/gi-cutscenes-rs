@@ -10,6 +10,16 @@ Much like its [original C\# implementation by ToaHartor](https://github.com/ToaH
 
 This implementation depends on `ffmpeg` being installed on the system (for now). We are working on being able to merge the different formats ourselves, but this is not yet operational.
 
+Commits are typically verified with GPG key [`E30568E404157F2A932071532C5FA04C19678729`](https://vulpinecitrus.info/Lymkwi.gpg.txt).
+You can get it with
+```bash
+curl -L https://vulpinecitrus.info/Lymkwi.gpg.txt | gpg --import -
+```
+You can then verify release signatures using that key :
+```bash
+gpg --verify <release-file> <release-sig>.asc
+```
+
 ## Usage
 
 You can simply call the program and provide it top-level arguments, a subcommand, and sub-command arguments.
@@ -63,7 +73,7 @@ Here are the most common commands :
 ./gi-cutscenes-rs -o battlePass_0.wav convertHca -n battlePass -i battlePass_0.hca
 ```
 
-## Build
+## Build & Install
 
 This implementation is written in Rust for speed and efficiency. It can be built with `cargo` using :
 ```
@@ -75,10 +85,27 @@ And installed in your cargo folder using :
 cargo install --path .
 ```
 
+### External Requirements
+
+While we aim to be able to only depend on the standard Rust library, and a crate here and there (notably [`clap`](https://lib.rs/clap)),
+there is no crate suitable to let us manually merge the IVF, WAV and ASS files into a MKV. As such, we depend on `ffmpeg` for this.
+
+While the original C\# implementation of this tool relied on [MKVMerge](https://www.bunkus.org/blog/) from the MKVToolNix suite, we figured
+`ffmpeg` would be better suited and more flexible.
+
+It can be installed on
+ - [Windows](https://www.gyan.dev/ffmpeg/builds/) using GyanDev's builds
+ - [Linux](https://ffmpeg.org/download.html#build-linux) using your favourite package manager
+ - [MacOS](https://ffmpeg.org/download.html#build-mac)
+ - just about anything where you can [compile the source code](https://ffmpeg.org/download.html#get-sources) (I've heard people put it on embedded hardware, it's not *that* hard)
+
+As soon as it is built, either the path to its binary is added in your path variable, or you can supply it using the `-p`/`--merge-program`
+argument described above.
+
 ## Roadmap
 
  - [X] Full pipeline of USM to (HCA + IVF) to (WAV + IVF) to MKV
- - [ ] Batch demux
+ - [X] Batch demux
  - [X] Single HCA to WAV file
  - [ ] Merging of sub files (obtainable in [Dimbreath's repository](https://github.com/Dimbreath/GenshinData/tree/master/Subtitle))
 

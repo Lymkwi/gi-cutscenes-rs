@@ -79,8 +79,8 @@ fn main() {
         .takes_value(true)
         .default_value("version.json");
     let args = Command::new("GI Cutscenes")
-        .version("0.0.2")
-        .author("Lux A. Phifollen <limefox@vulpinecitrus.info>")
+        .version("0.1.0")
+        .author("Lux A. Phifollen <contact@vulpinecitrus.info>")
         .about("Command-line utility to extract and demux GI cutscenes")
         // See https://users.rust-lang.org/t/clap-how-to-group-require-top-level-subcommands/24789
         .subcommand_required(true)
